@@ -3,7 +3,7 @@ name: UIandUnitTests
 on: [push]
 
 jobs:
-  build-and-test:
+  test:
 
     runs-on: macOS-latest
     
