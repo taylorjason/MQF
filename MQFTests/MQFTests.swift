@@ -10,16 +10,48 @@ import XCTest
 @testable import SwiftyJSON
 
 class MQFTests: XCTestCase {
-
+    
     override func setUp() {
         // Put setup code here. This method is called before the invocation of each test method in the class.
         
         
     }
-
+    
     override func tearDown() {
         // Put teardown code here. This method is called after the invocation of each test method in the class.
     }
+    /// Tests the creation of a `MQFData` object with known data
+    func testCreateMQF(){
+        let jsonString = "{\"name\":\"KCHS Local Pilot (2016)\",\"version\":1,\"description\":\"A set of questions to test the software with\",\"qual\":\"All\",\"positions\":[\"Pilot\"],\"file\":\"c17-KCHS-Pilot\",\"mds\":\"C-17\",\"id\":\"4\"}"
+        let json = JSON(parseJSON: jsonString)
+        let  mqf = MQFData.init(json: json)
+        
+        XCTAssertEqual(mqf.name, "KCHS Local Pilot (2016)", "Wrong MQF name")
+        XCTAssertEqual(mqf.crewPositions, ["Pilot"], "Wrong crew positions")
+        XCTAssertEqual(mqf.filename, "c17-KCHS-Pilot", "Wrong number of MQFs")
+    }
+    
+    /// Tests the creation of a `MQFPreset` object with known data
+    func testCreatePreset(){
+        let jsonString = "{\"name\":\"437/315 AW Pilot Test\",\"id\":\"KCHS-Pilot-Airland\",\"positions\":[\"Pilot\"],\"mqfs\":[{\"testNum\":30,\"file\":\"c17-Pilot-1nov\"},{\"testNum\":5,\"file\":\"c17-KCHS-Pilot\"}],\"testTotal\":35}"
+        let json = JSON(parseJSON: jsonString)
+        let preset = MQFPreset.init(json: json)
+        
+        XCTAssertEqual(preset.name, "437/315 AW Pilot Test", "Wrong preset name")
+        XCTAssertEqual(preset.crewPositions, ["Pilot"], "Wrong crew positions")
+        XCTAssertEqual(preset.mqfs.count, 2, "Wrong number of MQFs")
+    }
+    
+    /// Tests the creation of a `MQFBase` object with known data
+    func testCreateBase(){
+        let jsonString = "{\"name\":\"Charleston AFB Test\",\"id\":\"1\",\"presets\":[{\"name\":\"437/315 AW Pilot\",\"id\":\"KCHS-Pilot-Airland\",\"positions\":[\"Pilot\"],\"mqfs\":[{\"testNum\":30,\"file\":\"c17-Pilot-1nov\"},{\"testNum\":5,\"file\":\"c17-KCHS-Pilot\"}],\"testTotal\":35}]}"
+        let json = JSON(parseJSON: jsonString)
+        let base = MQFBase.init(json: json)
+        
+        XCTAssertEqual(base.name, "Charleston AFB Test", "Wrong base name")
+        XCTAssertEqual(base.presets.count, 1, "Wrong number of presets")
+    }
+    
     
     /// Iterates through every preset to make sure it loads properly
     /// Then goes through each question to make sure it has at least 2 possible answers
@@ -49,7 +81,7 @@ class MQFTests: XCTestCase {
             for mqf in activeMQFs{
                 testTotalQuestions += mqf.testNum
             }
-
+            
             for mqf in activeMQFs{
                 let name = mqf.filename.replacingOccurrences(of: ".json", with: "")
                 guard let path = Bundle.main.path(forResource: name, ofType: "json") else {
@@ -62,11 +94,11 @@ class MQFTests: XCTestCase {
             }
             quizSession.load(quiz: superQuiz)
             XCTAssert(superQuiz.orderedQuestions.count > 0, "No questions found")
-       
+            
             for question in superQuiz.orderedQuestions{
                 XCTAssert(question.responses.count > 1, "Not enough responses found for \(question.question)")
             }
-     
+            
             do {
                 try quizSession.start()
             } catch {
@@ -82,45 +114,64 @@ class MQFTests: XCTestCase {
             
             XCTAssertEqual(quizSession.responseCount, superQuiz.orderedQuestions.count, "Different number of answers than questions")
             XCTAssertEqual(quizSession.score, superQuiz.orderedQuestions.count, "Score was not 100")
-            quizSession.score
             
-
         }
         
-       }
-    
-    
-    func testCreatePreset(){
-           let jsonString = "{\"name\":\"437/315 AW Pilot Test\",\"id\":\"KCHS-Pilot-Airland\",\"positions\":[\"Pilot\"],\"mqfs\":[{\"testNum\":30,\"file\":\"c17-Pilot-1nov\"},{\"testNum\":5,\"file\":\"c17-KCHS-Pilot\"}],\"testTotal\":35}"
-           let json = JSON(parseJSON: jsonString)
-           let preset = MQFPreset.init(json: json)
-           
-        XCTAssertEqual(preset.name, "437/315 AW Pilot Test", "Wrong preset name")
-        XCTAssertEqual(preset.crewPositions, ["Pilot"], "Wrong crew positions")
-        XCTAssertEqual(preset.mqfs.count, 2, "Wrong number of MQFs")
-       }
-
-    
-    func testCreateBase(){
-        let jsonString = "{\"name\":\"Charleston AFB Test\",\"id\":\"1\",\"presets\":[{\"name\":\"437/315 AW Pilot\",\"id\":\"KCHS-Pilot-Airland\",\"positions\":[\"Pilot\"],\"mqfs\":[{\"testNum\":30,\"file\":\"c17-Pilot-1nov\"},{\"testNum\":5,\"file\":\"c17-KCHS-Pilot\"}],\"testTotal\":35}]}"
-        let json = JSON(parseJSON: jsonString)
-        let base = MQFBase.init(json: json)
-        
-        XCTAssertEqual(base.name, "Charleston AFB Test", "Wrong base name")
-        XCTAssertEqual(base.presets.count, 1, "Wrong number of presets")
     }
     
+    /// Iterates through every individual MQF to make sure it loads properly
+    /// Then goes through each question to make sure it has at least 2 possible answers
+    /// Submits the correct answer for each question to ensure user can get credit if they choose the correct one
+    func testAllMQFs(){
+        DataManager.shared.load()
+        let mqfs = DataManager.shared.availableMQFs
+        XCTAssert(mqfs.count > 0, "No MQFs found")
 
-    func testExample() {
-        // This is an example of a functional test case.
-        // Use XCTAssert and related functions to verify your tests produce the correct results.
+        for mqf in mqfs{
+            let quizSession = QKSession.default
+            var superQuiz = QKQuiz()
+            let name = mqf.filename.replacingOccurrences(of: ".json", with: "")
+            guard let path = Bundle.main.path(forResource: name, ofType: "json") else {
+                return
+            }
+            if let quiz = QKQuiz(loadFromJSONFile: path) {
+                XCTAssert(quiz.orderedQuestions.count > 0, "No questions found for MQF \(name)")
+                superQuiz.appendQuiz(quiz: quiz, limit:0)
+            }
+            
+            quizSession.load(quiz: superQuiz)
+            XCTAssert(superQuiz.orderedQuestions.count > 0, "No questions found")
+            
+            for question in superQuiz.orderedQuestions{
+                XCTAssert(question.responses.count > 1, "Not enough responses found for \(question.question)")
+            }
+            
+            do {
+                try quizSession.start()
+            } catch {
+                fatalError("Quiz started without quiz set on the session")
+            }
+            var activeQuestion:QKQuestion? = nil
+            while let question = quizSession.nextQuestion(after: activeQuestion){
+                XCTAssert(question.responses.count > 1, "No question responses found for \(question.question)")
+                quizSession.submit(response: question.correctResponse, for: question)
+                
+                activeQuestion = question
+            }
+            
+            XCTAssertEqual(quizSession.responseCount, superQuiz.orderedQuestions.count, "Different number of answers than questions")
+            XCTAssertEqual(quizSession.score, superQuiz.orderedQuestions.count, "Score was not 100")
+        }
     }
 
+    
+
+    
     func testPerformanceExample() {
         // This is an example of a performance test case.
         self.measure {
             // Put the code you want to measure the time of here.
         }
     }
-
+    
 }
