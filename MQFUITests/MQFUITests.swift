@@ -101,6 +101,7 @@ class MQFUITests: XCTestCase {
         let resultsNavigationBar = app.navigationBars["Results"]
         var c = 0
         while !resultsNavigationBar.exists {
+            print("Question number: \(c)")
             app.collectionViews.buttons["Next"].tap()
             c = c + 1
         }
