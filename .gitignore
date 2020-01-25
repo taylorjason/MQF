@@ -1,2 +1,4 @@
-
-MQF/JSONData/**
+xcuserdata
+.DS_Store
+Pods/
+Podfile.lock
